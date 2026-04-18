@@ -75,7 +75,7 @@ const seedPets: Pet[] = [
     vetPhone: "123-456-7890",
     notes: "He got some 'splainin to do",
     initials: "TB",
-    photo: "/avatars/theo.png",
+    photo: `${import.meta.env.BASE_URL}avatars/theo.png`,
   },
   {
     id: "p2",
@@ -84,7 +84,7 @@ const seedPets: Pet[] = [
     sex: "Male",
     colors: "Grey",
     initials: "WR",
-    photo: "/avatars/wally.png",
+    photo: `${import.meta.env.BASE_URL}avatars/wally.png`,
   },
 ];
 

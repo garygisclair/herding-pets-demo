@@ -94,7 +94,10 @@ export default function Layout() {
             )}
           >
             <Avatar className="size-9 shrink-0">
-              <AvatarImage src="/avatars/francine.png" alt="Francine Poulet" />
+              <AvatarImage
+                src={`${import.meta.env.BASE_URL}avatars/francine.png`}
+                alt="Francine Poulet"
+              />
               <AvatarFallback className="bg-gradient-to-br from-[#f4a261] to-[#e76f51] text-sm font-semibold text-white">
                 FP
               </AvatarFallback>
