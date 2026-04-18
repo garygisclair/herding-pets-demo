@@ -1,0 +1,116 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+  --font-display: "Atma", "Inter", sans-serif;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Herding Pets brand colors */
+  --color-pets: #8bd5ca;
+  --color-feeding: #c6a0f6;
+  --color-bathroom: #99d1db;
+  --color-health: #f9e2af;
+  --color-habits: #b8c0cc;
+  --color-configure: #a6da95;
+  --color-calendar: #d4a5a5;
+  --color-logout: #ee99a0;
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+:root {
+  --radius: 0.5rem;
+
+  /* Herding Pets dark theme (defaults for the app) */
+  --background: #4a4a4a;
+  --foreground: #f8f8f8;
+  --card: #3a3a3a;
+  --card-foreground: #f8f8f8;
+  --popover: #424242;
+  --popover-foreground: #f8f8f8;
+  --primary: #8bd5ca;
+  --primary-foreground: #1a1a1a;
+  --secondary: #c6a0f6;
+  --secondary-foreground: #1a1a1a;
+  --muted: #525252;
+  --muted-foreground: #cccccc;
+  --accent: #525252;
+  --accent-foreground: #f8f8f8;
+  --destructive: #ee99a0;
+  --border: rgba(255, 255, 255, 0.12);
+  --input: rgba(255, 255, 255, 0.06);
+  --ring: #8bd5ca;
+
+  --sidebar: #2e2e2e;
+  --sidebar-foreground: #f8f8f8;
+  --sidebar-primary: #8bd5ca;
+  --sidebar-primary-foreground: #1a1a1a;
+  --sidebar-accent: rgba(255, 255, 255, 0.06);
+  --sidebar-accent-foreground: #f8f8f8;
+  --sidebar-border: rgba(255, 255, 255, 0.08);
+  --sidebar-ring: #8bd5ca;
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  html,
+  body,
+  #root {
+    @apply h-full;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  input[type="date"]::-webkit-calendar-picker-indicator,
+  input[type="time"]::-webkit-calendar-picker-indicator {
+    filter: invert(1);
+    opacity: 0.5;
+    cursor: pointer;
+  }
+  input[type="date"]::-webkit-calendar-picker-indicator:hover,
+  input[type="time"]::-webkit-calendar-picker-indicator:hover {
+    opacity: 0.9;
+  }
+}
+
+/* Utility classes for recurring patterns */
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+  }
+}
