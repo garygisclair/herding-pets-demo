@@ -21,6 +21,7 @@ import {
 import { useStore, type Activity, type Category } from "@/store";
 import { DatePicker } from "@/components/DatePicker";
 import { TimePicker } from "@/components/TimePicker";
+import { cn } from "@/lib/utils";
 
 type Props = {
   open: boolean;
@@ -117,6 +118,8 @@ export default function AddActivityModal({
   const [poopScore, setPoopScore] = useState<string>("");
   const [painScore, setPainScore] = useState<string>("");
   const [submitted, setSubmitted] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [recording, setRecording] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -151,6 +154,7 @@ export default function AddActivityModal({
       setPainScore("");
     }
     setSubmitted(false);
+    setRecording(false);
   }, [open, activity, duplicateFrom, defaultPetId, defaultCategory]);
 
   // Reset subtype when user changes category (but not on initial load)
@@ -483,9 +487,22 @@ export default function AddActivityModal({
                 placeholder="Notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="min-h-[100px] pr-10 bg-input/80 dark:bg-input/80"
+                className="min-h-[100px] pr-14 bg-input/80 dark:bg-input/80"
               />
-              <Mic className="absolute right-3 top-3 size-4 text-muted-foreground" />
+              <button
+                type="button"
+                onClick={() => setRecording((r) => !r)}
+                aria-label={recording ? "Stop voice input" : "Start voice input"}
+                aria-pressed={recording}
+                className={cn(
+                  "absolute right-2 top-2 flex size-9 items-center justify-center rounded-full transition-colors outline-none focus-visible:ring-2 focus-visible:ring-pets focus-visible:ring-offset-2 focus-visible:ring-offset-[#424242]",
+                  recording
+                    ? "bg-pets text-primary-foreground"
+                    : "bg-muted-foreground/20 text-muted-foreground hover:bg-muted-foreground/30",
+                )}
+              >
+                <Mic className="size-5" />
+              </button>
             </div>
           )}
         </div>
@@ -495,10 +512,7 @@ export default function AddActivityModal({
             <Button
               variant="destructive"
               className="mr-auto text-primary-foreground"
-              onClick={() => {
-                deleteActivity(activity.id);
-                onOpenChange(false);
-              }}
+              onClick={() => setConfirmDelete(true)}
             >
               <Trash2 />
               Remove
@@ -510,6 +524,40 @@ export default function AddActivityModal({
           <Button onClick={submit}>{isEdit ? "Save" : "Add"}</Button>
         </DialogFooter>
       </DialogContent>
+
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove this activity?</DialogTitle>
+            <DialogDescription>
+              {activity && (
+                <>
+                  Are you sure you want to remove this{" "}
+                  <span className="font-medium text-foreground capitalize">
+                    {activity.subtype}
+                  </span>{" "}
+                  entry? This action cannot be undone.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDelete(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (activity) deleteActivity(activity.id);
+                setConfirmDelete(false);
+                onOpenChange(false);
+              }}
+            >
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

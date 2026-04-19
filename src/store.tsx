@@ -84,67 +84,78 @@ function generateSeedActivities(): Activity[] {
 
   const push = (a: Omit<Activity, "id">) => out.push({ ...a, id: nextId() });
 
+  // Deterministic pseudo-random jitter so reloads stay consistent but times
+  // look organic (no perfect horizontal banding in the timeline plot).
+  // Returns a minute offset in [-spread, +spread].
+  const jitter = (seed: number, spread: number) => {
+    const x = (seed * 9301 + 49297) % 233280;
+    return Math.round((x / 233280 - 0.5) * 2 * spread);
+  };
+
   for (let n = 29; n >= 0; n--) {
+    let slot = 0;
+    const j = (spread: number) => jitter(n * 100 + ++slot, spread);
+
     // ── Theo (p1) ───────────────────────────────────────────────────
-    // Feeding
-    push({ petId: "p1", category: "feeding", subtype: "Kibble", dosage: "1/4", unit: "cup", when: daysAgo(n, 7, 30) });
-    push({ petId: "p1", category: "feeding", subtype: "Kibble", dosage: "1/4", unit: "cup", when: daysAgo(n, 19, 30) });
+    // Feeding — kibble drifts ±60 min, wet food / treats wider
+    push({ petId: "p1", category: "feeding", subtype: "Kibble", dosage: "1/4", unit: "cup", when: daysAgo(n, 7, 30 + j(60)) });
+    push({ petId: "p1", category: "feeding", subtype: "Kibble", dosage: "1/4", unit: "cup", when: daysAgo(n, 19, 30 + j(60)) });
     if (n % 2 === 0) {
-      push({ petId: "p1", category: "feeding", subtype: "Wet food", dosage: "1", unit: "pouch", when: daysAgo(n, 12, 30) });
+      push({ petId: "p1", category: "feeding", subtype: "Wet food", dosage: "1", unit: "pouch", when: daysAgo(n, 12, 30 + j(120)) });
     }
     if (n % 5 === 0) {
-      push({ petId: "p1", category: "feeding", subtype: "Tuna", dosage: "1", unit: "tbsp", notes: "treat after play", when: daysAgo(n, 15, 0) });
+      push({ petId: "p1", category: "feeding", subtype: "Tuna", dosage: "1", unit: "tbsp", notes: "treat after play", when: daysAgo(n, 15, 0 + j(150)) });
     }
 
-    // Bathroom
-    push({ petId: "p1", category: "bathroom", subtype: "Pee", when: daysAgo(n, 6, 45) });
-    push({ petId: "p1", category: "bathroom", subtype: "Pee", when: daysAgo(n, 13, 15) });
-    push({ petId: "p1", category: "bathroom", subtype: "Pee", when: daysAgo(n, 21, 0) });
+    // Bathroom — pets are unpredictable (±180 min)
+    push({ petId: "p1", category: "bathroom", subtype: "Pee", when: daysAgo(n, 6, 45 + j(150)) });
+    push({ petId: "p1", category: "bathroom", subtype: "Pee", when: daysAgo(n, 13, 15 + j(180)) });
+    push({ petId: "p1", category: "bathroom", subtype: "Pee", when: daysAgo(n, 21, 0 + j(180)) });
     if (n % 3 !== 0) {
       const poopScore = n % 7 === 0 ? 5 : n % 11 === 0 ? 2 : 4;
-      push({ petId: "p1", category: "bathroom", subtype: "Poo", poopScore, when: daysAgo(n, 8, 30) });
+      push({ petId: "p1", category: "bathroom", subtype: "Poo", poopScore, when: daysAgo(n, 8, 30 + j(180)) });
     }
     if (n % 6 === 0) {
-      push({ petId: "p1", category: "bathroom", subtype: "Both", poopScore: 4, poopNotes: "regular", when: daysAgo(n, 17, 45) });
+      push({ petId: "p1", category: "bathroom", subtype: "Both", poopScore: 4, poopNotes: "regular", when: daysAgo(n, 17, 45 + j(180)) });
     }
 
-    // Health
-    push({ petId: "p1", category: "health", subtype: "Probiotic", dosage: "1.00 capsule", when: daysAgo(n, 7, 45) });
+    // Health — probiotic fairly scheduled, vitamin more variable
+    push({ petId: "p1", category: "health", subtype: "Probiotic", dosage: "1.00 capsule", when: daysAgo(n, 7, 45 + j(30)) });
     if (n % 3 === 0) {
-      push({ petId: "p1", category: "health", subtype: "Vitamin", dosage: "1.00 tablet", when: daysAgo(n, 19, 45) });
+      push({ petId: "p1", category: "health", subtype: "Vitamin", dosage: "1.00 tablet", when: daysAgo(n, 19, 45 + j(60)) });
     }
 
-    // Habits (category: "other")
-    push({ petId: "p1", category: "other", subtype: "Grooming", when: daysAgo(n, 9, 0) });
+    // Habits — wide spread (±150-180 min)
+    push({ petId: "p1", category: "other", subtype: "Grooming", when: daysAgo(n, 9, 0 + j(150)) });
     if (n % 2 === 0) {
-      push({ petId: "p1", category: "other", subtype: "Playing", notes: "wand toy", when: daysAgo(n, 20, 15) });
+      push({ petId: "p1", category: "other", subtype: "Playing", notes: "wand toy", when: daysAgo(n, 20, 15 + j(120)) });
     }
     if (n % 3 === 1) {
-      push({ petId: "p1", category: "other", subtype: "Playing", notes: "laser pointer", when: daysAgo(n, 16, 0) });
+      push({ petId: "p1", category: "other", subtype: "Playing", notes: "laser pointer", when: daysAgo(n, 16, 0 + j(180)) });
     }
     if (n % 4 === 0) {
-      push({ petId: "p1", category: "other", subtype: "Scratching", notes: "scratched post", when: daysAgo(n, 11, 30) });
+      push({ petId: "p1", category: "other", subtype: "Scratching", notes: "scratched post", when: daysAgo(n, 11, 30 + j(180)) });
     }
 
     // ── Wally (p2) — lighter pattern ────────────────────────────────
-    push({ petId: "p2", category: "feeding", subtype: "Kibble", dosage: "1/3", unit: "cup", when: daysAgo(n, 8, 0) });
-    push({ petId: "p2", category: "feeding", subtype: "Kibble", dosage: "1/3", unit: "cup", when: daysAgo(n, 20, 0) });
+    push({ petId: "p2", category: "feeding", subtype: "Kibble", dosage: "1/3", unit: "cup", when: daysAgo(n, 8, 0 + j(60)) });
+    push({ petId: "p2", category: "feeding", subtype: "Kibble", dosage: "1/3", unit: "cup", when: daysAgo(n, 20, 0 + j(60)) });
     if (n % 3 === 0) {
-      push({ petId: "p2", category: "feeding", subtype: "Tuna", dosage: "1", unit: "tbsp", when: daysAgo(n, 14, 30) });
+      push({ petId: "p2", category: "feeding", subtype: "Tuna", dosage: "1", unit: "tbsp", when: daysAgo(n, 14, 30 + j(120)) });
     }
 
-    push({ petId: "p2", category: "bathroom", subtype: "Pee", when: daysAgo(n, 7, 30) });
-    push({ petId: "p2", category: "bathroom", subtype: "Pee", when: daysAgo(n, 22, 0) });
+    push({ petId: "p2", category: "bathroom", subtype: "Pee", when: daysAgo(n, 7, 30 + j(150)) });
+    push({ petId: "p2", category: "bathroom", subtype: "Pee", when: daysAgo(n, 22, 0 + j(180)) });
     if (n % 2 === 1) {
-      push({ petId: "p2", category: "bathroom", subtype: "Poo", poopScore: 4, when: daysAgo(n, 10, 15) });
+      push({ petId: "p2", category: "bathroom", subtype: "Poo", poopScore: 4, when: daysAgo(n, 10, 15 + j(180)) });
     }
 
     if (n % 7 === 2) {
-      push({ petId: "p2", category: "health", subtype: "Vitamin", dosage: "0.5 tablet", when: daysAgo(n, 9, 30) });
+      push({ petId: "p2", category: "health", subtype: "Vitamin", dosage: "0.5 tablet", when: daysAgo(n, 9, 30 + j(45)) });
     }
 
     if (n % 4 === 2) {
-      push({ petId: "p2", category: "other", subtype: "Grooming", when: daysAgo(n, 11, 0) });
+      push({ petId: "p2", category: "other", subtype: "Grooming", when: daysAgo(n, 11, 0 + j(180)) });
     }
   }
 

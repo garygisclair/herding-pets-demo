@@ -1,6 +1,7 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import {
   BriefcaseMedical,
+  Download,
   Sparkles,
   Target,
   Toilet,
@@ -8,9 +9,36 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useStore, type Activity, type Category } from "@/store";
 import { cn } from "@/lib/utils";
+import { findOutlierIds } from "@/lib/outliers";
+import CategoryTimelineModal from "@/components/CategoryTimelineModal";
+
+type CatFilter = "all" | Category;
+
+const CAT_OPTIONS: { value: CatFilter; label: string }[] = [
+  { value: "all", label: "All categories" },
+  { value: "feeding", label: "Feeding" },
+  { value: "bathroom", label: "Bathroom" },
+  { value: "health", label: "Health" },
+  { value: "other", label: "Habits" },
+];
+
+const RANGE_LABELS: Record<string, string> = {
+  "7": "last 7 days",
+  "30": "last 30 days",
+  "90": "last 90 days",
+  all: "all time",
+};
 
 const CAT_META: Record<
   Category,
@@ -67,23 +95,44 @@ function StatCard({ label, value, sub, valueClassName }: StatCardProps) {
 
 export default function Reports() {
   const { pets, activities } = useStore();
+  const [petId, setPetId] = useState("all");
+  const [cat, setCat] = useState<CatFilter>("all");
+  const [range, setRange] = useState("30");
+  const [modalCat, setModalCat] = useState<Category | null>(null);
+
+  const rangeDays = range === "all" ? null : Number(range);
+  const rangeLabel = RANGE_LABELS[range] ?? "this period";
+
+  const filtered = useMemo(() => {
+    const cutoff = rangeDays === null ? 0 : Date.now() - rangeDays * 86_400_000;
+    return activities.filter((a) => {
+      if (petId !== "all" && a.petId !== petId) return false;
+      if (cat !== "all" && a.category !== cat) return false;
+      if (new Date(a.when).getTime() < cutoff) return false;
+      return true;
+    });
+  }, [activities, petId, cat, rangeDays]);
 
   const insights = useMemo(() => {
+    // past/prev 7d windows use the pet+category filters (not the range) so
+    // week-over-week comparisons stay meaningful across range choices.
+    const basePetCat = activities.filter((a) => {
+      if (petId !== "all" && a.petId !== petId) return false;
+      if (cat !== "all" && a.category !== cat) return false;
+      return true;
+    });
     const now = Date.now();
-    const past30 = activities.filter(
-      (a) => now - new Date(a.when).getTime() < 30 * 86_400_000,
-    );
-    const past7 = activities.filter(
+    const past7 = basePetCat.filter(
       (a) => now - new Date(a.when).getTime() < 7 * 86_400_000,
     );
-    const prev7 = activities.filter((a) => {
+    const prev7 = basePetCat.filter((a) => {
       const d = now - new Date(a.when).getTime();
       return d >= 7 * 86_400_000 && d < 14 * 86_400_000;
     });
 
     const totals = CATS.reduce<Record<Category, number>>(
       (acc, k) => {
-        acc[k] = past30.filter((x) => x.category === k).length;
+        acc[k] = filtered.filter((x) => x.category === k).length;
         return acc;
       },
       { feeding: 0, bathroom: 0, health: 0, other: 0 },
@@ -93,9 +142,9 @@ export default function Reports() {
       .sort((a, b) => b[1] - a[1])
       .find(([, n]) => n > 0);
 
-    // Consecutive-day logging streak ending today
+    // Consecutive-day logging streak ending today (scoped to filters)
     const days = new Set(
-      activities.map((a) => {
+      filtered.map((a) => {
         const d = new Date(a.when);
         d.setHours(0, 0, 0, 0);
         return d.getTime();
@@ -111,18 +160,29 @@ export default function Reports() {
       else break;
     }
 
-    const avg = (past30.length / 30).toFixed(1);
+    let divisor: number;
+    if (rangeDays !== null) {
+      divisor = rangeDays;
+    } else if (filtered.length === 0) {
+      divisor = 1;
+    } else {
+      const oldest = new Date(filtered[filtered.length - 1].when).getTime();
+      divisor = Math.max(1, Math.round((now - oldest) / 86_400_000));
+    }
+    const avg = (filtered.length / divisor).toFixed(1);
     const wow = prev7.length
       ? Math.round(((past7.length - prev7.length) / prev7.length) * 100)
       : null;
 
     const hours = Array<number>(24).fill(0);
-    past30.forEach((a) => {
+    filtered.forEach((a) => {
       hours[new Date(a.when).getHours()]++;
     });
     const peakHour =
-      past30.length > 0 ? hours.indexOf(Math.max(...hours)) : null;
+      filtered.length > 0 ? hours.indexOf(Math.max(...hours)) : null;
 
+    // Last bathroom is intentionally independent of the category filter so
+    // the storyline line stays meaningful even when viewing another category.
     const lastBathroomByPet = new Map<string, Activity | undefined>(
       pets.map((p) => {
         const b = activities
@@ -136,7 +196,6 @@ export default function Reports() {
     );
 
     return {
-      past30,
       past7,
       totals,
       topCatEntry,
@@ -146,14 +205,45 @@ export default function Reports() {
       peakHour,
       lastBathroomByPet,
     };
-  }, [activities, pets]);
+  }, [filtered, activities, pets, petId, cat, rangeDays]);
 
-  const grandTotal = insights.past30.length;
+  const grandTotal = filtered.length;
+  const visiblePets = petId === "all" ? pets : pets.filter((p) => p.id === petId);
+
+  // Per-category outlier counts (honors the same filters as the tiles).
+  const outlierCounts = useMemo(() => {
+    const counts: Record<Category, number> = { feeding: 0, bathroom: 0, health: 0, other: 0 };
+    CATS.forEach((k) => {
+      const catActs = filtered.filter((a) => a.category === k);
+      counts[k] = findOutlierIds(catActs).size;
+    });
+    return counts;
+  }, [filtered]);
+
+  // Drill-in dataset: pet + range filtered, but always scoped to the clicked
+  // category (ignores the global category filter so any tile is meaningful).
+  const modalActivities = useMemo(() => {
+    if (!modalCat) return [];
+    const cutoff =
+      rangeDays === null ? 0 : Date.now() - rangeDays * 86_400_000;
+    return activities.filter((a) => {
+      if (petId !== "all" && a.petId !== petId) return false;
+      if (a.category !== modalCat) return false;
+      if (new Date(a.when).getTime() < cutoff) return false;
+      return true;
+    });
+  }, [modalCat, activities, petId, rangeDays]);
+
+  const clear = () => {
+    setPetId("all");
+    setCat("all");
+    setRange("30");
+  };
 
   // Per-pet breakdown (sorted by activity count desc)
-  const perPet = [...pets]
+  const perPet = [...visiblePets]
     .map((p) => {
-      const petActs = insights.past30.filter((a) => a.petId === p.id);
+      const petActs = filtered.filter((a) => a.petId === p.id);
       const petTotals = CATS.reduce<Record<Category, number>>(
         (acc, k) => {
           acc[k] = petActs.filter((a) => a.category === k).length;
@@ -170,10 +260,64 @@ export default function Reports() {
 
   return (
     <>
-      <h1 className="mb-2 font-display text-4xl font-medium text-pets">Reports</h1>
-      <p className="mb-6 text-sm text-muted-foreground">
-        A snapshot of the last 30 days — what&apos;s going well and what to watch.
-      </p>
+      <h1 className="mb-6 font-display text-4xl font-medium text-pets">Reports</h1>
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground">
+          A snapshot of the {rangeLabel} — what&apos;s going well and what to watch.
+        </p>
+        <Button
+          variant="outline"
+          className="border-pets text-pets hover:bg-pets/10 hover:text-pets"
+        >
+          <Download />
+          Download Report
+        </Button>
+      </div>
+
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <Select value={petId} onValueChange={setPetId}>
+          <SelectTrigger className="w-[220px] bg-card">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All pets</SelectItem>
+            {pets.map((p) => (
+              <SelectItem key={p.id} value={p.id}>
+                {p.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={cat} onValueChange={(v) => setCat(v as CatFilter)}>
+          <SelectTrigger className="w-[180px] bg-card">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CAT_OPTIONS.map((o) => (
+              <SelectItem key={o.value} value={o.value}>
+                {o.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        <Select value={range} onValueChange={setRange}>
+          <SelectTrigger className="w-[140px] bg-card">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="7">Last 7 Days</SelectItem>
+            <SelectItem value="30">Last 30 Days</SelectItem>
+            <SelectItem value="90">Last 90 Days</SelectItem>
+            <SelectItem value="all">All time</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Button variant="ghost" onClick={clear}>
+          Clear Filters
+        </Button>
+      </div>
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <div
@@ -194,14 +338,14 @@ export default function Reports() {
           </div>
           <div className="mb-3 font-sans text-[22px] font-medium leading-snug text-foreground">
             {grandTotal === 0 ? (
-              "No activities yet — log your first to see insights."
+              "No activities match the selected filters."
             ) : (
               <>
                 You&apos;ve logged{" "}
                 <span className="text-pets">{grandTotal}</span>{" "}
                 activities across{" "}
-                <span className="text-pets">{pets.length}</span>{" "}
-                pet{pets.length === 1 ? "" : "s"} this month.
+                <span className="text-pets">{visiblePets.length}</span>{" "}
+                pet{visiblePets.length === 1 ? "" : "s"} in the {rangeLabel}.
               </>
             )}
           </div>
@@ -258,8 +402,8 @@ export default function Reports() {
         />
         <StatCard
           label="Pets tracked"
-          value={pets.length}
-          sub="in your household"
+          value={visiblePets.length}
+          sub={petId === "all" ? "in your household" : "currently filtered"}
           valueClassName="text-health"
         />
       </div>
@@ -271,23 +415,26 @@ export default function Reports() {
         <div className="flex h-10 gap-[2px] overflow-hidden rounded-lg">
           {grandTotal === 0 ? (
             <div className="flex w-full items-center justify-center bg-white/5 text-xs text-muted-foreground">
-              No activities in the last 30 days
+              No activities match the selected filters
             </div>
           ) : (
             CATS.map((k) => {
               const w = (insights.totals[k] / grandTotal) * 100;
               if (w === 0) return null;
               return (
-                <div
+                <button
                   key={k}
+                  type="button"
+                  onClick={() => setModalCat(k)}
+                  aria-label={`Show ${CAT_META[k].label} timeline`}
                   className={cn(
-                    "flex items-center justify-center text-[11px] font-semibold text-[#1a1a1a]",
+                    "flex items-center justify-center text-[11px] font-semibold text-[#1a1a1a] transition-opacity hover:opacity-85 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pets",
                     CAT_META[k].bg,
                   )}
                   style={{ width: `${w}%` }}
                 >
                   {w > 10 ? `${Math.round(w)}%` : ""}
-                </div>
+                </button>
               );
             })
           )}
@@ -297,21 +444,32 @@ export default function Reports() {
           {CATS.map((k) => {
             const Icon = CAT_META[k].icon;
             return (
-              <div
+              <button
                 key={k}
-                className="flex items-center gap-3 rounded-lg bg-white/[0.03] px-4 py-2.5"
+                type="button"
+                onClick={() => setModalCat(k)}
+                aria-label={`Show ${CAT_META[k].label} timeline`}
+                className="flex items-center gap-3 rounded-lg bg-white/[0.03] px-4 py-2.5 text-left transition-colors hover:bg-white/[0.06] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-pets"
               >
                 <Icon className={cn("size-[18px]", CAT_META[k].text)} />
                 <div className="flex-1">
                   <div className="text-sm text-foreground">{CAT_META[k].label}</div>
                   <div className="text-xs text-muted-foreground">
-                    {insights.totals[k]} in last 30 days
+                    {insights.totals[k]} in the {rangeLabel}
+                    {outlierCounts[k] > 0 && (
+                      <>
+                        {" · "}
+                        <span className="text-destructive">
+                          {outlierCounts[k]} off-schedule
+                        </span>
+                      </>
+                    )}
                   </div>
                 </div>
                 <div className={cn("font-medium text-[22px] leading-none", CAT_META[k].text)}>
                   {insights.totals[k]}
                 </div>
-              </div>
+              </button>
             );
           })}
         </div>
@@ -342,10 +500,10 @@ export default function Reports() {
                   </div>
                   <div className="mt-1 text-[13px] text-muted-foreground">
                     {count === 0 ? (
-                      "No activity this month"
+                      `No activity in the ${rangeLabel}`
                     ) : (
                       <>
-                        {count} {count === 1 ? "activity" : "activities"} this month
+                        {count} {count === 1 ? "activity" : "activities"} in the {rangeLabel}
                         {topCat && (
                           <>
                             {" · mostly "}
@@ -388,6 +546,14 @@ export default function Reports() {
           })}
         </div>
       </Card>
+
+      <CategoryTimelineModal
+        category={modalCat}
+        activities={modalActivities}
+        rangeDays={rangeDays}
+        rangeLabel={rangeLabel}
+        onOpenChange={(o) => !o && setModalCat(null)}
+      />
     </>
   );
 }
