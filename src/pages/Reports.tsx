@@ -321,22 +321,42 @@ export default function Reports() {
 
       {/* ── Hero ─────────────────────────────────────────────────────── */}
       <div
-        className="mb-4 grid grid-cols-[auto_1fr] items-start gap-5 rounded-2xl border border-pets/25 p-8"
+        className="mb-4 grid grid-cols-[auto_1fr] items-center gap-4 rounded-2xl border border-pets/25 px-6 py-4"
         style={{
           background:
             "linear-gradient(135deg, rgba(139,213,202,0.12), rgba(198,160,246,0.1))",
         }}
       >
-        <div className="flex size-[60px] items-center justify-center rounded-full bg-pets/20 text-pets">
-          <Sparkles className="size-7" />
+        <div
+          className="flex size-[64px] items-center justify-center rounded-full p-[3px] shadow-[0_0_18px_-4px_rgba(198,160,246,0.5)]"
+          style={{
+            backgroundImage:
+              "linear-gradient(135deg, var(--color-logout) 0%, var(--color-feeding) 55%, var(--color-pets) 100%)",
+          }}
+        >
+          <div className="flex size-full items-center justify-center rounded-full bg-[#2a2a2a] ring-1 ring-inset ring-white/10">
+            {insights.streak > 0 ? (
+              <span
+                className="font-retro font-black leading-none text-[26px] tabular-nums bg-clip-text text-transparent pb-[2px]"
+                style={{
+                  backgroundImage:
+                    "linear-gradient(135deg, var(--color-logout) 0%, var(--color-feeding) 55%, var(--color-pets) 100%)",
+                }}
+              >
+                {insights.streak}
+              </span>
+            ) : (
+              <Sparkles className="size-6 text-pets" />
+            )}
+          </div>
         </div>
         <div>
-          <div className="mb-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-pets">
+          <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-pets">
             {insights.streak > 0
               ? `${insights.streak}-day logging streak`
               : "Time to start a streak"}
           </div>
-          <div className="mb-3 font-sans text-[22px] font-medium leading-snug text-foreground">
+          <div className="mb-1.5 font-sans text-[17px] font-medium leading-snug text-foreground">
             {grandTotal === 0 ? (
               "No activities match the selected filters."
             ) : (
@@ -350,7 +370,7 @@ export default function Reports() {
             )}
           </div>
           {grandTotal > 0 && (
-            <div className="text-[13px] leading-snug text-muted-foreground">
+            <div className="text-[12px] leading-snug text-muted-foreground">
               That&apos;s an average of{" "}
               <strong className="font-semibold text-foreground/90">
                 {insights.avg}
@@ -410,7 +430,12 @@ export default function Reports() {
 
       {/* ── What you're tracking ─────────────────────────────────────── */}
       <Card className="mb-4 gap-5 px-6 py-6">
-        <div className="text-base font-semibold">What you&apos;re tracking</div>
+        <div>
+          <div className="text-base font-semibold">What you&apos;re tracking</div>
+          <div className="mt-1 text-xs text-muted-foreground">
+            Click a segment or category card to see a day × time-of-day view of those activities.
+          </div>
+        </div>
         {/* 100% stacked bar */}
         <div className="flex h-10 gap-[2px] overflow-hidden rounded-lg">
           {grandTotal === 0 ? (
