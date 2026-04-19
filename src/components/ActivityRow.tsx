@@ -79,9 +79,6 @@ export default function ActivityRow({
       <div className="min-w-0">
         <div className="truncate text-sm font-medium capitalize text-foreground">{a.subtype}</div>
         <div className="mt-0.5 truncate text-xs text-muted-foreground">
-          {a.poopScore !== undefined ? `Score: ${a.poopScore} • ` : ""}
-          {a.dosage && a.category === "feeding" ? `${a.dosage} ${a.unit ?? ""} • ` : ""}
-          {a.category === "health" && a.dosage ? `${a.dosage} • ` : ""}
           {formatWhen(a.when)}
         </div>
       </div>

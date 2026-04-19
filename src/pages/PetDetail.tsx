@@ -133,7 +133,12 @@ export default function PetDetail() {
         onOpenChange={(o) => !o && setActivityEdit(undefined)}
         activity={activityEdit}
       />
-      <AddPetModal open={editOpen} onOpenChange={setEditOpen} pet={pet} />
+      <AddPetModal
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        pet={pet}
+        onDeleted={() => nav("/")}
+      />
     </>
   );
 }

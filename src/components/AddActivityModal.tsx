@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Check, Mic, Plus, X } from "lucide-react";
+import { Check, Mic, Plus, Trash2, X } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -39,8 +39,32 @@ const CATS: { value: Category; label: string; dot: string }[] = [
 
 const FOOD_TYPES = ["Kibble", "Wet food", "Treats", "Tuna", "Water"];
 const BATHROOM_TYPES = ["Pee", "Poop", "Both"];
-const HEALTH_TYPES = ["Vitamin", "Medication", "Vet visit", "Grooming"];
+const HEALTH_TYPES = ["Vitamin", "Medication", "Weight", "Pain", "Vet visit", "Grooming"];
+const WEIGHT_UNITS = ["lbs", "kg"];
+
+const PAIN_SCORES = [
+  { value: 1, label: "No pain" },
+  { value: 2, label: "" },
+  { value: 3, label: "" },
+  { value: 4, label: "" },
+  { value: 5, label: "" },
+  { value: 6, label: "" },
+  { value: 7, label: "" },
+  { value: 8, label: "" },
+  { value: 9, label: "" },
+  { value: 10, label: "Extremely bad" },
+];
 const HABIT_TYPES = ["Walk", "Play", "Training", "Sleep"];
+
+const POOP_SCORES = [
+  { value: 1, label: "Very dry logs or pellets" },
+  { value: 2, label: "Logs, Firm but not hard" },
+  { value: 3, label: "Log shaped with moist surface" },
+  { value: 4, label: "Very moist and soggy log" },
+  { value: 5, label: "Very moist distinct pile(s)" },
+  { value: 6, label: "Has texture, no defined shape" },
+  { value: 7, label: "Watery, some texture" },
+];
 
 function typeFieldLabel(c: Category) {
   if (c === "feeding") return "Food Type";
@@ -70,7 +94,7 @@ export default function AddActivityModal({
   defaultCategory,
   activity,
 }: Props) {
-  const { pets, customTypes, addActivity, updateActivity, addCustomType } = useStore();
+  const { pets, customTypes, addActivity, updateActivity, deleteActivity, addCustomType } = useStore();
   const isEdit = Boolean(activity);
 
   const [petId, setPetId] = useState(defaultPetId ?? pets[0]?.id ?? "");
@@ -87,6 +111,9 @@ export default function AddActivityModal({
   const [serving, setServing] = useState("");
   const [unit, setUnit] = useState("");
   const [notes, setNotes] = useState("");
+  const [poopScore, setPoopScore] = useState<string>("");
+  const [painScore, setPainScore] = useState<string>("");
+  const [submitted, setSubmitted] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -102,6 +129,8 @@ export default function AddActivityModal({
       setNotes(
         activity.notes || activity.poopNotes || activity.peeNotes || "",
       );
+      setPoopScore(activity.poopScore ? String(activity.poopScore) : "");
+      setPainScore(activity.painScore ? String(activity.painScore) : "");
     } else {
       if (defaultPetId) setPetId(defaultPetId);
       if (defaultCategory) setCategory(defaultCategory);
@@ -109,7 +138,10 @@ export default function AddActivityModal({
       setServing("");
       setUnit("");
       setNotes("");
+      setPoopScore("");
+      setPainScore("");
     }
+    setSubmitted(false);
   }, [open, activity, defaultPetId, defaultCategory]);
 
   // Reset subtype when user changes category (but not on initial load)
@@ -154,6 +186,15 @@ export default function AddActivityModal({
 
   const submit = () => {
     if (!petId) return;
+    setSubmitted(true);
+    if (!subtype) return;
+    if (
+      category === "bathroom" &&
+      (subtype === "Poop" || subtype === "Both") &&
+      !poopScore
+    )
+      return;
+    if (category === "health" && subtype === "Pain" && !painScore) return;
     const when = new Date(`${date}T${time}`).toISOString();
     const payload: Omit<Activity, "id"> = { petId, category, subtype, when };
     if (category === "feeding") {
@@ -162,6 +203,22 @@ export default function AddActivityModal({
       payload.notes = notes;
     } else if (category === "health" || category === "other") {
       payload.notes = notes;
+      if (
+        category === "health" &&
+        (subtype === "Vitamin" || subtype === "Medication" || subtype === "Weight")
+      ) {
+        payload.dosage = serving;
+        payload.unit = unit;
+      }
+      if (category === "health" && subtype === "Pain" && painScore) {
+        payload.painScore = Number(painScore);
+      }
+    } else if (category === "bathroom") {
+      if (subtype === "Pee") payload.peeNotes = notes;
+      if (subtype === "Poop" || subtype === "Both") {
+        payload.poopNotes = notes;
+        if (poopScore) payload.poopScore = Number(poopScore);
+      }
     }
     if (isEdit && activity) {
       updateActivity(activity.id, payload);
@@ -171,8 +228,24 @@ export default function AddActivityModal({
     onOpenChange(false);
   };
 
-  const showNotes = category !== "bathroom";
-  const showServing = category === "feeding";
+  const showNotes =
+    category !== "bathroom" ||
+    subtype === "Pee" ||
+    subtype === "Poop" ||
+    subtype === "Both";
+  const isWeight = category === "health" && subtype === "Weight";
+  const showServing =
+    category === "feeding" ||
+    (category === "health" &&
+      (subtype === "Vitamin" || subtype === "Medication" || subtype === "Weight"));
+  const servingLabel = isWeight
+    ? "Weight"
+    : category === "feeding"
+      ? "Serving"
+      : "Dosage";
+  const showPoopScale =
+    category === "bathroom" && (subtype === "Poop" || subtype === "Both");
+  const showPainScale = category === "health" && subtype === "Pain";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -188,7 +261,7 @@ export default function AddActivityModal({
 
         <div className="flex flex-col gap-[18px] pt-2">
           <Select value={petId} onValueChange={setPetId}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full data-[size=default]:h-10 bg-input/80 dark:bg-input/80 dark:hover:bg-input/80">
               <SelectValue placeholder="Pet" />
             </SelectTrigger>
             <SelectContent>
@@ -200,8 +273,11 @@ export default function AddActivityModal({
             </SelectContent>
           </Select>
 
+          <DatePicker value={date} onChange={setDate} />
+          <TimePicker value={time} onChange={setTime} />
+
           <Select value={category} onValueChange={(v) => setCategory(v as Category)}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full data-[size=default]:h-10 bg-input/80 dark:bg-input/80 dark:hover:bg-input/80">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -215,9 +291,6 @@ export default function AddActivityModal({
               ))}
             </SelectContent>
           </Select>
-
-          <DatePicker value={date} onChange={setDate} />
-          <TimePicker value={time} onChange={setTime} />
 
           {addingNew ? (
             <div>
@@ -239,12 +312,13 @@ export default function AddActivityModal({
                     }
                   }}
                   placeholder={`New ${typeFieldLabel(category).toLowerCase()}`}
-                  className={newTypeError ? "border-destructive" : ""}
+                  className={`h-10 bg-input/80 dark:bg-input/80 ${newTypeError ? "border-destructive" : ""}`}
                 />
                 <Button
                   type="button"
                   size="icon"
                   variant="secondary"
+                  className="size-10"
                   onClick={commitNewType}
                   aria-label="Add"
                 >
@@ -254,6 +328,7 @@ export default function AddActivityModal({
                   type="button"
                   size="icon"
                   variant="ghost"
+                  className="size-10"
                   onClick={cancelNewType}
                   aria-label="Cancel"
                 >
@@ -265,47 +340,127 @@ export default function AddActivityModal({
               )}
             </div>
           ) : (
-            <Select
-              value={subtype}
-              onValueChange={(v) => {
-                if (v === "__add_new__") {
-                  setAddingNew(true);
-                  return;
-                }
-                setSubtype(v);
-              }}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder={typeFieldLabel(category)} />
-              </SelectTrigger>
-              <SelectContent>
-                {allTypes.map((t) => (
-                  <SelectItem key={t} value={t}>
-                    {t}
-                  </SelectItem>
-                ))}
-                <SelectItem value="__add_new__" className="text-pets">
-                  <span className="flex items-center gap-2">
-                    <Plus className="size-4" />
-                    Add new…
-                  </span>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <div>
+              <Select
+                value={subtype}
+                onValueChange={(v) => {
+                  if (v === "__add_new__") {
+                    setAddingNew(true);
+                    return;
+                  }
+                  setSubtype(v);
+                }}
+              >
+                <SelectTrigger
+                  aria-invalid={submitted && !subtype}
+                  className="w-full data-[size=default]:h-10 bg-input/80 dark:bg-input/80 dark:hover:bg-input/80"
+                >
+                  <SelectValue placeholder={typeFieldLabel(category)} />
+                </SelectTrigger>
+                <SelectContent>
+                  {allTypes.map((t) => (
+                    <SelectItem key={t} value={t}>
+                      {t}
+                    </SelectItem>
+                  ))}
+                  {category !== "bathroom" && (
+                    <SelectItem value="__add_new__" className="text-pets">
+                      <span className="flex items-center gap-2">
+                        <Plus className="size-4" />
+                        Add new…
+                      </span>
+                    </SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+              {submitted && !subtype && (
+                <p className="mt-1.5 text-xs text-destructive">
+                  {typeFieldLabel(category)} is required
+                </p>
+              )}
+            </div>
           )}
 
           {showServing && (
             <div className="grid grid-cols-2 gap-3">
               <Input
-                placeholder="Serving"
+                placeholder={servingLabel}
                 value={serving}
                 onChange={(e) => setServing(e.target.value)}
+                inputMode={isWeight ? "decimal" : undefined}
+                className="h-10 bg-input/80 dark:bg-input/80"
               />
-              <Input
-                placeholder="Unit"
-                value={unit}
-                onChange={(e) => setUnit(e.target.value)}
-              />
+              {isWeight ? (
+                <Select value={unit} onValueChange={setUnit}>
+                  <SelectTrigger className="w-full data-[size=default]:h-10 bg-input/80 dark:bg-input/80 dark:hover:bg-input/80">
+                    <SelectValue placeholder="Unit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {WEIGHT_UNITS.map((u) => (
+                      <SelectItem key={u} value={u}>
+                        {u}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Input
+                  placeholder="Unit"
+                  value={unit}
+                  onChange={(e) => setUnit(e.target.value)}
+                  className="h-10 bg-input/80 dark:bg-input/80"
+                />
+              )}
+            </div>
+          )}
+
+          {showPoopScale && (
+            <div>
+              <Select value={poopScore} onValueChange={setPoopScore}>
+                <SelectTrigger
+                  aria-invalid={submitted && !poopScore}
+                  className="w-full data-[size=default]:h-10 bg-input/80 dark:bg-input/80 dark:hover:bg-input/80"
+                >
+                  <SelectValue placeholder="Poop Score" />
+                </SelectTrigger>
+                <SelectContent>
+                  {POOP_SCORES.map((s) => (
+                    <SelectItem key={s.value} value={String(s.value)}>
+                      {s.value} - {s.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {submitted && !poopScore && (
+                <p className="mt-1.5 text-xs text-destructive">
+                  Poop Score is required
+                </p>
+              )}
+            </div>
+          )}
+
+          {showPainScale && (
+            <div>
+              <Select value={painScore} onValueChange={setPainScore}>
+                <SelectTrigger
+                  aria-invalid={submitted && !painScore}
+                  className="w-full data-[size=default]:h-10 bg-input/80 dark:bg-input/80 dark:hover:bg-input/80"
+                >
+                  <SelectValue placeholder="Pain Score" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAIN_SCORES.map((s) => (
+                    <SelectItem key={s.value} value={String(s.value)}>
+                      {s.label ? `${s.value} - ${s.label}` : String(s.value)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {submitted && !painScore && (
+                <p className="mt-1.5 text-xs text-destructive">
+                  Pain Score is required
+                </p>
+              )}
             </div>
           )}
 
@@ -315,7 +470,7 @@ export default function AddActivityModal({
                 placeholder="Notes"
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
-                className="min-h-[100px] pr-10"
+                className="min-h-[100px] pr-10 bg-input/80 dark:bg-input/80"
               />
               <Mic className="absolute right-3 top-3 size-4 text-muted-foreground" />
             </div>
@@ -323,6 +478,19 @@ export default function AddActivityModal({
         </div>
 
         <DialogFooter>
+          {isEdit && activity && (
+            <Button
+              variant="destructive"
+              className="mr-auto text-primary-foreground"
+              onClick={() => {
+                deleteActivity(activity.id);
+                onOpenChange(false);
+              }}
+            >
+              <Trash2 />
+              Remove
+            </Button>
+          )}
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>

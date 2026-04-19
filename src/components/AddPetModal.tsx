@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PawPrint, Pencil } from "lucide-react";
+import { PawPrint, Pencil, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -32,6 +32,7 @@ type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved?: (p: Pet) => void;
+  onDeleted?: () => void;
   pet?: Pet;
 };
 
@@ -46,8 +47,8 @@ const EMPTY_FORM = {
   notes: "",
 };
 
-export default function AddPetModal({ open, onOpenChange, onSaved, pet }: Props) {
-  const { addPet, updatePet } = useStore();
+export default function AddPetModal({ open, onOpenChange, onSaved, onDeleted, pet }: Props) {
+  const { addPet, updatePet, deletePet } = useStore();
   const isEdit = Boolean(pet);
   const [form, setForm] = useState(EMPTY_FORM);
   const [defaultPet, setDefaultPet] = useState(false);
@@ -129,10 +130,10 @@ export default function AddPetModal({ open, onOpenChange, onSaved, pet }: Props)
         </div>
 
         <div className="flex flex-col gap-[18px]">
-          <Input placeholder="Name *" value={form.name} onChange={(e) => set("name", e.target.value)} />
-          <Input placeholder="Nickname" value={form.nickname} onChange={(e) => set("nickname", e.target.value)} />
+          <Input placeholder="Name *" value={form.name} onChange={(e) => set("name", e.target.value)} className="bg-input/80 dark:bg-input/80" />
+          <Input placeholder="Nickname" value={form.nickname} onChange={(e) => set("nickname", e.target.value)} className="bg-input/80 dark:bg-input/80" />
           <Select value={form.sex ?? ""} onValueChange={(v) => set("sex", v as Pet["sex"])}>
-            <SelectTrigger className="w-full">
+            <SelectTrigger className="w-full bg-input/80 dark:bg-input/80 dark:hover:bg-input/80">
               <SelectValue placeholder="Sex" />
             </SelectTrigger>
             <SelectContent>
@@ -140,15 +141,15 @@ export default function AddPetModal({ open, onOpenChange, onSaved, pet }: Props)
               <SelectItem value="Female">Female</SelectItem>
             </SelectContent>
           </Select>
-          <Input placeholder="Breed" value={form.breed} onChange={(e) => set("breed", e.target.value)} />
-          <Input placeholder="Color" value={form.colors} onChange={(e) => set("colors", e.target.value)} />
-          <Input placeholder="Vet name" value={form.vetName} onChange={(e) => set("vetName", e.target.value)} />
-          <Input placeholder="Vet phone" value={form.vetPhone} onChange={(e) => set("vetPhone", e.target.value)} />
+          <Input placeholder="Breed" value={form.breed} onChange={(e) => set("breed", e.target.value)} className="bg-input/80 dark:bg-input/80" />
+          <Input placeholder="Color" value={form.colors} onChange={(e) => set("colors", e.target.value)} className="bg-input/80 dark:bg-input/80" />
+          <Input placeholder="Vet name" value={form.vetName} onChange={(e) => set("vetName", e.target.value)} className="bg-input/80 dark:bg-input/80" />
+          <Input placeholder="Vet phone" value={form.vetPhone} onChange={(e) => set("vetPhone", e.target.value)} className="bg-input/80 dark:bg-input/80" />
           <Textarea
             placeholder="Notes"
             value={form.notes}
             onChange={(e) => set("notes", e.target.value)}
-            className="min-h-[100px]"
+            className="min-h-[100px] bg-input/80 dark:bg-input/80"
           />
         </div>
 
@@ -166,6 +167,20 @@ export default function AddPetModal({ open, onOpenChange, onSaved, pet }: Props)
         )}
 
         <DialogFooter>
+          {isEdit && pet && (
+            <Button
+              variant="destructive"
+              className="mr-auto text-primary-foreground"
+              onClick={() => {
+                deletePet(pet.id);
+                onOpenChange(false);
+                onDeleted?.();
+              }}
+            >
+              <Trash2 />
+              Remove
+            </Button>
+          )}
           <Button variant="ghost" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
