@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { PawPrint, Pencil, Trash2 } from "lucide-react";
+import { PawPrint, Trash2, Upload } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -52,6 +52,7 @@ export default function AddPetModal({ open, onOpenChange, onSaved, onDeleted, pe
   const isEdit = Boolean(pet);
   const [form, setForm] = useState(EMPTY_FORM);
   const [defaultPet, setDefaultPet] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) =>
     setForm((s) => ({ ...s, [k]: v }));
 
@@ -120,7 +121,7 @@ export default function AddPetModal({ open, onOpenChange, onSaved, onDeleted, pe
                     aria-label="Upload photo"
                     className="absolute bottom-0 right-0 flex size-9 items-center justify-center rounded-full bg-health text-[#3a2a00] ring-[3px] ring-[#424242] transition-transform hover:scale-105"
                   >
-                    <Pencil className="size-4" />
+                    <Upload className="size-4" />
                   </button>
                 </TooltipTrigger>
                 <TooltipContent>Upload photo</TooltipContent>
@@ -171,11 +172,7 @@ export default function AddPetModal({ open, onOpenChange, onSaved, onDeleted, pe
             <Button
               variant="destructive"
               className="mr-auto text-primary-foreground"
-              onClick={() => {
-                deletePet(pet.id);
-                onOpenChange(false);
-                onDeleted?.();
-              }}
+              onClick={() => setConfirmDelete(true)}
             >
               <Trash2 />
               Remove
@@ -189,6 +186,39 @@ export default function AddPetModal({ open, onOpenChange, onSaved, onDeleted, pe
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      <Dialog open={confirmDelete} onOpenChange={setConfirmDelete}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Remove this pet?</DialogTitle>
+            <DialogDescription>
+              {pet && (
+                <>
+                  Are you sure you want to remove{" "}
+                  <span className="font-medium text-foreground">{pet.name}</span>?
+                  This will also delete all their activity records. This action cannot be undone.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirmDelete(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                if (pet) deletePet(pet.id);
+                setConfirmDelete(false);
+                onOpenChange(false);
+                onDeleted?.();
+              }}
+            >
+              Remove
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }

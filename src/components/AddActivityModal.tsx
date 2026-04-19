@@ -28,6 +28,7 @@ type Props = {
   defaultPetId?: string;
   defaultCategory?: Category;
   activity?: Activity;
+  duplicateFrom?: Activity;
 };
 
 const CATS: { value: Category; label: string; dot: string }[] = [
@@ -93,9 +94,11 @@ export default function AddActivityModal({
   defaultPetId,
   defaultCategory,
   activity,
+  duplicateFrom,
 }: Props) {
   const { pets, customTypes, addActivity, updateActivity, deleteActivity, addCustomType } = useStore();
   const isEdit = Boolean(activity);
+  const isDuplicate = Boolean(duplicateFrom);
 
   const [petId, setPetId] = useState(defaultPetId ?? pets[0]?.id ?? "");
   const [category, setCategory] = useState<Category>(defaultCategory ?? "feeding");
@@ -117,20 +120,26 @@ export default function AddActivityModal({
 
   useEffect(() => {
     if (!open) return;
-    if (activity) {
-      const { date: d, time: t } = splitWhen(activity.when);
-      setPetId(activity.petId);
-      setCategory(activity.category);
-      setSubtype(activity.subtype);
+    const source = activity ?? duplicateFrom;
+    if (source) {
+      // For duplicate: prefill from source but reset the date/time to now
+      const now = new Date();
+      const { date: d, time: t } = duplicateFrom
+        ? {
+            date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
+            time: `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`,
+          }
+        : splitWhen(source.when);
+      setPetId(source.petId);
+      setCategory(source.category);
+      setSubtype(source.subtype);
       setDate(d);
       setTime(t);
-      setServing(activity.dosage ?? "");
-      setUnit(activity.unit ?? "");
-      setNotes(
-        activity.notes || activity.poopNotes || activity.peeNotes || "",
-      );
-      setPoopScore(activity.poopScore ? String(activity.poopScore) : "");
-      setPainScore(activity.painScore ? String(activity.painScore) : "");
+      setServing(source.dosage ?? "");
+      setUnit(source.unit ?? "");
+      setNotes(source.notes || source.poopNotes || source.peeNotes || "");
+      setPoopScore(source.poopScore ? String(source.poopScore) : "");
+      setPainScore(source.painScore ? String(source.painScore) : "");
     } else {
       if (defaultPetId) setPetId(defaultPetId);
       if (defaultCategory) setCategory(defaultCategory);
@@ -142,16 +151,16 @@ export default function AddActivityModal({
       setPainScore("");
     }
     setSubmitted(false);
-  }, [open, activity, defaultPetId, defaultCategory]);
+  }, [open, activity, duplicateFrom, defaultPetId, defaultCategory]);
 
   // Reset subtype when user changes category (but not on initial load)
   useEffect(() => {
-    if (!open || activity) return;
+    if (!open || activity || duplicateFrom) return;
     setSubtype("");
     setAddingNew(false);
     setNewType("");
     setNewTypeError(null);
-  }, [category, open, activity]);
+  }, [category, open, activity, duplicateFrom]);
 
   const allTypes = useMemo(
     () => [...typeOptions(category), ...customTypes[category]],
@@ -252,10 +261,14 @@ export default function AddActivityModal({
       <DialogContent className="max-w-[600px] bg-[#424242] text-foreground">
         <DialogHeader>
           <DialogTitle className="text-[22px] font-semibold">
-            {isEdit ? "Edit Activity" : "Add Activity"}
+            {isEdit ? "Edit Activity" : isDuplicate ? "Duplicate Activity" : "Add Activity"}
           </DialogTitle>
           <DialogDescription className="sr-only">
-            {isEdit ? "Update this activity" : "Log a new activity for your pet"}
+            {isEdit
+              ? "Update this activity"
+              : isDuplicate
+                ? "Review and save a copy of this activity"
+                : "Log a new activity for your pet"}
           </DialogDescription>
         </DialogHeader>
 
